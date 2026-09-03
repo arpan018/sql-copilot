@@ -1,0 +1,23 @@
+# Secrets — never commit credentials
+.env
+
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.uv/
+
+# Phase 2 audit logs (created later)
+logs/
+
+# Local interpreter pin (optional)
+.python-version
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
