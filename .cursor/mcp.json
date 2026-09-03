@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "sql-copilot": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "sql_mcp.server"],
+      "cwd": "C:\\Arpan\\sql_mcp_server",
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    }
+  }
+}
