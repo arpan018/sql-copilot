@@ -1,0 +1,18 @@
+[project]
+name = "sql-mcp"
+version = "0.1.0"
+description = "MCP server for safe, schema-aware PostgreSQL access from AI agents"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=3.0",
+    "psycopg2-binary>=2.9",
+    "python-dotenv>=1.0",
+    "sqlglot>=23.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sql_mcp"]
