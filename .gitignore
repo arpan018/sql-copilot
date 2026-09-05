@@ -20,6 +20,9 @@ logs/
 # Local interpreter pin (optional)
 .python-version
 
+# Local helper / one-off scripts — keep out of the repo
+scripts/
+
 # OS / editor
 .DS_Store
 Thumbs.db
