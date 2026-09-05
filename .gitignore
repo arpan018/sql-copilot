@@ -1,6 +1,9 @@
 # Secrets — never commit credentials
 .env
 
+# Local / agent working notes (specs, WIP, conversation helpers)
+docs/
+
 # Python / uv
 .venv/
 __pycache__/
