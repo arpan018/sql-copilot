@@ -3,24 +3,23 @@ PostgreSQL connection pool for the MCP server.
 
 Why a pool instead of one connection at startup
 -----------------------------------------------
-Phase 1 only reads catalog metadata, so a single long-lived connection
-would appear to work. Phase 2 needs per-call transactions (BEGIN /
-COMMIT / ROLLBACK for dry_run and mutations). Two tools cannot safely
-share one connection that might already be mid-transaction.
+Inspect tools only read catalog metadata, so a single long-lived
+connection would appear to work. Execute tools need per-call transactions
+(BEGIN / COMMIT / ROLLBACK for dry_run and mutations). Two tools cannot
+safely share one connection that might already be mid-transaction.
 
-Every database access in this project — Phase 1 or Phase 2 — must go
-through get_db_connection(). Tools never call psycopg2.connect()
-themselves. That keeps the server within Postgres's connection limit
-and returns connections to the pool even when a query fails.
+Every database access in this project must go through
+get_db_connection(). Tools never call psycopg2.connect() themselves.
+That keeps the server within Postgres's connection limit and returns
+connections to the pool even when a query fails.
 
 Inputs / outputs
 ----------------
 init_pool(dsn): dsn is a libpq URL from DB_URL in .env, for example
     postgresql://postgres:postgres@localhost:5432/dvd_rental_db
 get_db_connection(autocommit=True): yields a live psycopg2 connection.
-    Phase 1 tools keep autocommit=True (read-only). Phase 2 mutation
-    tools will pass autocommit=False and call commit()/rollback()
-    inside the with-block.
+    Inspect tools keep autocommit=True (read-only). Mutation tools pass
+    autocommit=False and call commit()/rollback() inside the with-block.
 """
 
 from __future__ import annotations
@@ -66,9 +65,9 @@ def get_db_connection(autocommit: bool = True) -> Iterator[PgConnection]:
     information_schema query cannot leak a connection. After putconn,
     the caller must not use the connection object.
 
-    autocommit=True (Phase 1 default): each statement is its own
-    transaction. Fine for SELECT against catalogs.
-    autocommit=False (Phase 2): the caller owns COMMIT/ROLLBACK.
+    autocommit=True (default): each statement is its own transaction.
+    Fine for SELECT against catalogs.
+    autocommit=False: the caller owns COMMIT/ROLLBACK.
     """
     if _connection_pool is None:
         raise RuntimeError(
@@ -80,7 +79,7 @@ def get_db_connection(autocommit: bool = True) -> Iterator[PgConnection]:
     try:
         yield conn
     finally:
-        # If a Phase 2 caller leaves an open transaction, reset it
+        # If a caller leaves an open transaction, reset it
         # before reuse so the next tool does not inherit that state.
         try:
             if not conn.closed and not conn.autocommit:

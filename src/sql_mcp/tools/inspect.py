@@ -1,5 +1,5 @@
 """
-Phase 1 MCP tools: connect, inspect schema, narrow context for SQL writing.
+Inspect tools: connect, read schema, narrow context for SQL writing.
 
 These functions are registered onto a FastMCP instance via register(mcp).
 This module never imports sql_mcp.server (that would be a circular import).
@@ -70,10 +70,10 @@ _STOP_WORDS = {
 
 def register(mcp) -> None:
     """
-    Attach every Phase 1 tool to the given FastMCP instance.
+    Attach every inspect tool to the given FastMCP instance.
 
-    Called once from server.py at startup. Phase 2 will add a second
-    register() from tools.phase2 without changing this file.
+    Called once from server.py at startup. execute.register(mcp) is
+    separate so this file stays limited to schema inspection.
     """
 
     @mcp.tool
@@ -114,7 +114,7 @@ def _ping_connection() -> dict:
     """
     SELECT version() on a pooled connection.
 
-    Success JSON matches the Phase 1 spec. Failures return status=error
+    Success JSON is a short connectivity summary. Failures return status=error
     so the agent can tell the user the database is down.
     """
     host, port = _parse_db_url()

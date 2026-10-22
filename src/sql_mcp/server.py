@@ -4,7 +4,7 @@ MCP server entry point.
 Creates the FastMCP instance, initialises the DB connection pool,
 loads the schema cache, and registers every tool module.
 
-Phase 2 registers tools via phase2.register(mcp) next to Phase 1.
+inspect.register(mcp) and execute.register(mcp) attach the tools.
 load_dotenv() runs before those imports so MODE and LOG_PATH are visible.
 
 Transport is stdio by default (mcp.run()). Cursor launches this as a
@@ -23,13 +23,12 @@ from fastmcp import FastMCP
 load_dotenv()
 
 from sql_mcp import connection, schema
-from sql_mcp.tools import phase1
-from sql_mcp.tools import phase2
+from sql_mcp.tools import execute, inspect
 
 mcp = FastMCP("sql-copilot")
 
-phase1.register(mcp)
-phase2.register(mcp)
+inspect.register(mcp)
+execute.register(mcp)
 
 
 def main() -> None:

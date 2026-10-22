@@ -1,7 +1,7 @@
 """
 Append-only JSON Lines audit log for MCP tool calls.
 
-Phase 3 will import log_entry() without the MCP server running, so this
+Callers can import log_entry() without the MCP server running. This
 module depends only on the stdlib and LOG_PATH from the environment
 (or the default logs/sql_mcp.jsonl).
 

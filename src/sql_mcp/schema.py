@@ -5,16 +5,16 @@ Why cache
 ---------
 get_schema is called often by the agent. Re-querying catalogs on every
 chat turn is slow and noisy. We load once at server startup
-(refresh_schema) and serve the dict. Phase 2 will call refresh_schema()
-again after successful DDL.
+(refresh_schema) and serve the dict. Successful DDL calls
+refresh_schema() again so the cache matches the new columns.
 
 The cache is a module-level dict, not only an MCP tool return value.
-A future validator can import get_cached_schema() without a DB round-trip.
+validator.py imports get_cached_schema() without a DB round-trip.
 
 Scope
 -----
-Only table_schema = 'public' (matches the Phase 1 spec). dvd_rental_db
-keeps application tables there.
+Only table_schema = 'public'. The learning database keeps application
+tables there.
 
 Row counts / indexes for get_table_info live in this module too:
 - approximate_row_count uses pg_class.reltuples (planner estimate, not COUNT(*))

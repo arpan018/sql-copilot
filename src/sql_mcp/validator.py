@@ -1,8 +1,8 @@
 """
 sqlglot-based classification and schema checks. Never executes SQL.
 
-Phase 3 will pass compiled SQL strings (possibly with %s or $1). Those
-placeholders are rewritten to NULL before parse so the tree still builds.
+Compiled SQL may contain %s or $1 placeholders. Those are rewritten
+to NULL before parse so the tree still builds.
 
 The schema cache from schema.py is the source of truth for identifier
 checks — no extra catalog round-trip.
@@ -293,8 +293,8 @@ def blocked_operation_message(op: str) -> dict[str, Any]:
         "operation_type": op,
         "sql_not_executed": True,
         "error": (
-            f"{op} is not allowed through this MCP server in Phase 2. "
-            "DROP and TRUNCATE are always blocked. CREATE is deferred. "
+            f"{op} is not allowed through this MCP server. "
+            "DROP, CREATE, and TRUNCATE are blocked. "
             "Use run_select, run_mutation, or alter_table_safe as appropriate."
         ),
     }

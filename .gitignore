@@ -14,7 +14,7 @@ dist/
 build/
 .uv/
 
-# Phase 2 audit logs (created later)
+# Audit logs
 logs/
 
 # Local interpreter pin (optional)

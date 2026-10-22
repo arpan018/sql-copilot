@@ -1,7 +1,6 @@
 """
 sql_mcp — MCP server package for schema-aware PostgreSQL access.
 
-This package is the local subprocess Cursor launches via stdio. Phase 1
-only reads metadata and returns JSON context; it does not execute
-user-authored DML/DDL.
+Cursor launches this package over stdio. Inspect tools return schema
+context. Execute tools run SQL only after parsing and safety checks.
 """

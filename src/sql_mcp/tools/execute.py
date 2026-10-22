@@ -1,8 +1,8 @@
 """
-Phase 2 MCP tools: validate, execute with safeguards, log, refresh schema.
+Execute tools: validate, run SQL with safeguards, log, refresh schema.
 
-Implementations are ordinary functions so Phase 3 can import them without
-the MCP protocol. register(mcp) only wraps them with @mcp.tool.
+Implementations are ordinary functions so other Python code can import
+them without the MCP protocol. register(mcp) only wraps them with @mcp.tool.
 
 This module never imports sql_mcp.server.
 """
@@ -25,7 +25,7 @@ from sql_mcp import validator as val
 
 
 def register(mcp) -> None:
-    """Attach every Phase 2 tool. Called once from server.py."""
+    """Attach every execute tool. Called once from server.py."""
 
     @mcp.tool
     def run_select(sql: str) -> dict:
@@ -196,7 +196,7 @@ def validate_query_impl(sql: str) -> dict:
     if op in {"DROP", "TRUNCATE"}:
         warnings.append(f"{op} is always blocked by this server.")
     if op == "CREATE":
-        warnings.append("CREATE is blocked in Phase 2.")
+        warnings.append("CREATE is not supported by this server.")
     if op == "ALTER":
         warnings.append("Use alter_table_safe for a diff preview before running this DDL.")
     if op == "SELECT":
