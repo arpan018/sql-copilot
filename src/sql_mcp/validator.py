@@ -20,7 +20,15 @@ from sqlglot.errors import ParseError
 
 from sql_mcp import schema as schema_mod
 
-DEFAULT_SELECT_LIMIT = 200
+# Rows actually sent back to the agent. Keeps a paid chat context small.
+PREVIEW_ROW_LIMIT = 10
+# LIMIT added only on the copy-paste statement when the user wrote none.
+LOCAL_SQL_LIMIT = 200
+
+AUTO_EXECUTE_DISABLED = (
+    "DDL and DML auto-execute is disabled. "
+    "Copy the SQL into pgAdmin or your own SQL client and run it there."
+)
 
 # Postgres SQLSTATE → learner-facing sentence. Always return both raw and this.
 ERROR_TRANSLATIONS = {
@@ -203,20 +211,110 @@ def has_limit(expression: exp.Expression) -> bool:
     return expression.args.get("limit") is not None or expression.find(exp.Limit) is not None
 
 
-def inject_select_limit(expression: exp.Expression) -> tuple[str, bool]:
-    """
-    Return (sql, limit_was_injected).
+def _top_limit_value(expression: exp.Expression) -> int | None:
+    """Integer on this statement's own LIMIT, ignoring limits inside subqueries."""
+    node = expression.args.get("limit")
+    if not isinstance(node, exp.Limit):
+        return None
+    literal = node.expression
+    if not isinstance(literal, exp.Literal) or literal.is_string:
+        return None
+    try:
+        return int(literal.this)
+    except (TypeError, ValueError):
+        return None
 
-    Only SELECT trees get a LIMIT 200 when missing. The rewritten SQL is
-    what run_select executes so the agent context window cannot explode.
+
+def _with_top_limit(expression: exp.Expression, row_limit: int) -> exp.Expression:
+    """Set this statement's LIMIT and clear any OFFSET so the preview does not skip rows."""
+    limited = expression.copy()
+    limited.set("offset", None)
+    limited.set("limit", exp.Limit(expression=exp.Literal.number(row_limit)))
+    return limited
+
+
+def _unwrap(node: exp.Expression) -> exp.Expression:
+    while isinstance(node, exp.Paren):
+        node = node.this
+    return node
+
+
+def _literal_one(node: exp.Expression) -> bool:
+    node = _unwrap(node)
+    return isinstance(node, exp.Literal) and not node.is_string and str(node.this) == "1"
+
+
+def where_matches_every_row(expression: exp.Expression) -> bool:
+    """True for WHERE true and WHERE 1=1. Those filters match every row."""
+    where = expression.args.get("where")
+    if not isinstance(where, exp.Where):
+        return False
+    condition = _unwrap(where.this)
+    if isinstance(condition, exp.Boolean) and condition.this is True:
+        return True
+    if isinstance(condition, exp.EQ):
+        return _literal_one(condition.this) and _literal_one(condition.expression)
+    return False
+
+
+def select_hides_a_write(expression: exp.Expression) -> str | None:
+    """
+    A statement shaped like a SELECT that still changes data.
+
+    SELECT INTO creates a table. A WITH clause can hide DELETE, UPDATE, or INSERT.
     """
     if not isinstance(expression, (exp.Select, exp.Union)):
-        return expression.sql(dialect="postgres"), False
-    if has_limit(expression):
-        return expression.sql(dialect="postgres"), False
-    limited = expression.copy()
-    limited.set("limit", exp.Limit(expression=exp.Literal.number(DEFAULT_SELECT_LIMIT)))
-    return limited.sql(dialect="postgres"), True
+        return None
+    if expression.args.get("into") is not None:
+        return "SELECT INTO creates a table."
+    for node in expression.walk():
+        if node is expression:
+            continue
+        if isinstance(node, (exp.Insert, exp.Update, exp.Delete, exp.Drop, exp.Create, exp.Alter)):
+            return "This SELECT contains a data-changing statement."
+    return None
+
+
+def preview_and_local_sql(expression: exp.Expression, original_sql: str) -> dict[str, Any]:
+    """
+    preview_sql is executed and returns at most PREVIEW_ROW_LIMIT rows.
+    local_sql is the statement a person pastes into pgAdmin.
+    A LIMIT of 200 is added to local_sql only when the user did not write one.
+    """
+    if not isinstance(expression, (exp.Select, exp.Union)):
+        text = original_sql.strip().rstrip(";")
+        return {
+            "preview_sql": text,
+            "local_sql": text,
+            "preview_capped": False,
+            "local_limit_added": False,
+        }
+
+    current = _top_limit_value(expression)
+    if current is None or current > PREVIEW_ROW_LIMIT:
+        preview_sql = _with_top_limit(expression, PREVIEW_ROW_LIMIT).sql(dialect="postgres")
+        preview_capped = True
+    else:
+        kept = expression.copy()
+        kept.set("offset", None)
+        preview_sql = kept.sql(dialect="postgres")
+        preview_capped = False
+
+    if current is None and expression.args.get("limit") is None:
+        local_sql = _with_top_limit(expression, LOCAL_SQL_LIMIT).sql(dialect="postgres")
+        local_limit_added = True
+    else:
+        shown = expression.copy()
+        shown.set("offset", None)
+        local_sql = shown.sql(dialect="postgres")
+        local_limit_added = False
+
+    return {
+        "preview_sql": preview_sql,
+        "local_sql": local_sql,
+        "preview_capped": preview_capped,
+        "local_limit_added": local_limit_added,
+    }
 
 
 def validate_against_schema(expression: exp.Expression) -> dict[str, Any] | None:
@@ -293,9 +391,8 @@ def blocked_operation_message(op: str) -> dict[str, Any]:
         "operation_type": op,
         "sql_not_executed": True,
         "error": (
-            f"{op} is not allowed through this MCP server. "
-            "DROP, CREATE, and TRUNCATE are blocked. "
-            "Use run_select, run_mutation, or alter_table_safe as appropriate."
+            f"{op} is not allowed to run through this MCP server. "
+            f"{AUTO_EXECUTE_DISABLED}"
         ),
     }
 
@@ -303,8 +400,4 @@ def blocked_operation_message(op: str) -> dict[str, Any]:
 def expected_tool_for(op: str) -> str:
     if op == "SELECT":
         return "run_select"
-    if op in {"INSERT", "UPDATE", "DELETE"}:
-        return "run_mutation or dry_run"
-    if op == "ALTER":
-        return "alter_table_safe"
-    return "validate_query (this operation cannot be executed)"
+    return "validate_query (DDL and DML auto-execute is disabled)"

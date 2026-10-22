@@ -1,6 +1,6 @@
 # sql-copilot
 
-MCP server for schema-aware PostgreSQL access from Cursor. The agent inspects the live schema, then runs SQL through tools that parse, limit, confirm, and log each call.
+MCP server for schema-aware PostgreSQL access from Cursor. The agent inspects the live schema and can run a short SELECT preview. DDL and DML are returned as SQL for a person to run locally. They are not executed by the server.
 
 Cursor launches it over stdio (`uv run python -m sql_mcp.server`). There is no HTTP port.
 
@@ -15,14 +15,12 @@ Cursor launches it over stdio (`uv run python -m sql_mcp.server`). There is no H
 
 **Execute** (`src/sql_mcp/tools/execute.py`)
 
-- `run_select` — SELECT only. Injects `LIMIT 200` when the statement has no LIMIT.
+- `run_select` — SELECT only. Returns at most 10 rows (a preview). Also returns `sql_to_run_locally` for pgAdmin. If you omitted `LIMIT`, that copy includes `LIMIT 200`.
 - `validate_query` — classify a statement without running it
-- `dry_run` — INSERT, UPDATE, or DELETE, then roll back
-- `run_mutation` — write only when `confirmed` is true
-- `alter_table_safe` — preview an ALTER, then run it and refresh the schema cache
+- `dry_run`, `run_mutation`, `alter_table_safe` — do not run the SQL. They return the statement and say auto-execute is disabled.
 - `refresh_schema`, `get_logs`, `get_status`
 
-DROP, CREATE, and TRUNCATE are blocked. `MODE=prod` blocks ALTER, and blocks UPDATE or DELETE that has no WHERE clause.
+INSERT, UPDATE, DELETE, ALTER, DROP, CREATE, and TRUNCATE are not executed.
 
 ## Setup
 

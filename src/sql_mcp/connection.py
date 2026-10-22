@@ -3,10 +3,10 @@ PostgreSQL connection pool for the MCP server.
 
 Why a pool instead of one connection at startup
 -----------------------------------------------
-Inspect tools only read catalog metadata, so a single long-lived
-connection would appear to work. Execute tools need per-call transactions
-(BEGIN / COMMIT / ROLLBACK for dry_run and mutations). Two tools cannot
-safely share one connection that might already be mid-transaction.
+Each tool call borrows one connection and returns it. Two calls cannot
+share a connection that might still be inside a transaction. This server
+does not execute DDL or DML; the pool still rolls an open transaction
+back before a connection is reused.
 
 Every database access in this project must go through
 get_db_connection(). Tools never call psycopg2.connect() themselves.
@@ -18,8 +18,8 @@ Inputs / outputs
 init_pool(dsn): dsn is a libpq URL from DB_URL in .env, for example
     postgresql://postgres:postgres@localhost:5432/dvd_rental_db
 get_db_connection(autocommit=True): yields a live psycopg2 connection.
-    Inspect tools keep autocommit=True (read-only). Mutation tools pass
-    autocommit=False and call commit()/rollback() inside the with-block.
+    Current tools use autocommit=True. If a caller passes False and leaves
+    a transaction open, the connection is rolled back before reuse.
 """
 
 from __future__ import annotations
