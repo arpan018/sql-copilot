@@ -1,8 +1,8 @@
 # Secrets — never commit credentials
 .env
 
-# Local / agent working notes (specs, WIP, conversation helpers)
-docs/
+# Private notes and drafts. Not part of the published project.
+local_docs/
 
 # Python / uv
 .venv/
