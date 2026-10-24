@@ -1,6 +1,9 @@
 # Secrets — never commit credentials
 .env
 
+# Cursor MCP config contains a machine-specific clone path
+.cursor/mcp.json
+
 # Private notes and drafts. Not part of the published project.
 local_docs/
 

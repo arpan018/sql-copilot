@@ -37,7 +37,7 @@ uv sync
 copy .env.example .env
 ```
 
-Set `DB_URL` in `.env`. In `.cursor/mcp.json`, set `cwd` to your clone path. `PYTHONPATH` stays `src`.
+Set `DB_URL` in `.env`. Copy `.cursor/mcp.example.json` to `.cursor/mcp.json`, then replace `cwd` with the folder where you cloned this project. Keep `PYTHONPATH` as `src`.
 
 ```text
 uv run python -m sql_mcp.server

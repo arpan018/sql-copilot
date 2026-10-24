@@ -33,7 +33,7 @@ uv sync
 copy .env.example .env
 ```
 
-Set `DB_URL` in `.env` as above. In `.cursor/mcp.json`, set `cwd` to the folder where you cloned this repo. The checked-in path is one machine's path and will not match yours. `PYTHONPATH` must stay `src`.
+Set `DB_URL` in `.env` as above. Copy `.cursor/mcp.example.json` to `.cursor/mcp.json`, then set `cwd` to the folder where you cloned this repo. `PYTHONPATH` must stay `src`.
 
 Reload the MCP server in Cursor, then check three calls:
 
