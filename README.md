@@ -76,6 +76,12 @@ Each tool is a function registered on a FastMCP server. Cursor speaks to that pr
 
 Every database call borrows a connection from a small pool and returns it.
 
+## Current limits
+
+- Write commands are refused, including common writes hidden inside a `SELECT`. A warning is added for `UPDATE` or `DELETE` with no filter or an always-true filter. Some PostgreSQL functions can still have side effects, so use a database account with read-only access.
+- Schema checks use the cached table and column names. Queries with table aliases or unclear column names may not be checked correctly.
+- Automated tests are a possible next step. For now, the setup guide has a short manual check list.
+
 ## Roadmap
 
 Package the same stdio server as a Docker image so Cursor can start it with `docker run -i` without a local Python install. The container would still be an MCP process, not a web service.

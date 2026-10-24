@@ -51,6 +51,12 @@ Reload the MCP server in Cursor, then check three calls:
 - `UPDATE` or `DELETE` with no `WHERE`, or with `WHERE true` or `WHERE 1=1`, is warned about. It is still not executed.
 - Postgres errors on a real `SELECT` include the raw message and a short explanation.
 
+## Current limits
+
+- Write commands are refused, including common writes hidden inside a `SELECT`. Some PostgreSQL functions can still have side effects. Use a database account with read-only access.
+- Schema checks use cached names and may miss mistakes involving table aliases or unclear column names.
+- Automated tests are a possible next step. The clone guide currently has manual checks instead.
+
 ## Inspect
 
 These tools read the catalog or the cache. They do not run your SQL against table data.
