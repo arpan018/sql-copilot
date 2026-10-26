@@ -1,8 +1,8 @@
 # sql-copilot
 
-A local [MCP](https://modelcontextprotocol.io) server for PostgreSQL. Cursor starts it as a subprocess. The model calls named tools. The server returns JSON. Nothing listens on a port.
+A local [MCP](https://modelcontextprotocol.io) server for PostgreSQL. An MCP client such as Cursor or Codex starts it as a subprocess. The model calls named tools, and the server returns results over stdio. It does not open a network port.
 
-Reads are limited on purpose. A `SELECT` returns at most 10 rows, plus the SQL to run locally for a larger result. `INSERT`, `UPDATE`, `DELETE`, and DDL are not executed. The server returns the statement so a person can run it in their own SQL client.
+`run_select` returns at most 10 preview rows and SQL you can run in your own SQL client. Direct `INSERT`, `UPDATE`, `DELETE`, and DDL statements are returned without being run. A `SELECT` does run in PostgreSQL, so use a database account with read-only access.
 
 Arguments, result shapes, and a clone-and-test checklist are in the [tool spec](docs/tools.md).
 
@@ -26,7 +26,7 @@ Execute (`src/sql_mcp/tools/execute.py`) is the only place SQL is accepted.
 | `dry_run`, `run_mutation`, `alter_table_safe` | Return the write or DDL unchanged. They do not run it |
 | `refresh_schema` | Reloads the in-memory schema cache |
 | `get_logs` | Recent audit lines. `SELECT` results are not stored |
-| `get_status` | Connection, cache age, and the last mutation record |
+| `get_status` | Connection, cache age, and the latest recorded INSERT, UPDATE, or DELETE request |
 
 ## Setup
 
@@ -42,6 +42,14 @@ Set `DB_URL` in `.env`. Copy `.cursor/mcp.example.json` to `.cursor/mcp.json`, t
 ```text
 uv run python -m sql_mcp.server
 ```
+
+Run the automated safety check from the repository root:
+
+```text
+uv run python -m unittest discover -s tests -v
+```
+
+This check confirms that the SQL validator notices a `DELETE` hidden inside a `SELECT`. It does not need a running database.
 
 ## Design
 
@@ -70,17 +78,17 @@ flowchart TD
   writeTool --> refused
 ```
 
-Each tool is a function registered on a FastMCP server. Cursor speaks to that process over stdio.
+Each tool is a function registered on a FastMCP server. The MCP client speaks to that process over stdio.
 
-`schema.py` loads the public schema once at startup and serves it from memory, so later turns do not re-query the catalog. `validator.py` parses SQL with sqlglot before any statement can run: one statement only, names checked against the cache, and a 10-row cap on `SELECT`. Writes never reach the database. `logger.py` appends one JSON line per call and omits `SELECT` row data.
+`schema.py` loads the public schema once at startup and serves it from memory. `validator.py` checks SQL before a preview runs and caps the result at 10 rows. Write tools do not run write statements. `logger.py` appends one JSON line per call and does not store `SELECT` result rows.
 
 Every database call borrows a connection from a small pool and returns it.
 
 ## Current limits
 
-- Write commands are refused, including common writes hidden inside a `SELECT`. A warning is added for `UPDATE` or `DELETE` with no filter or an always-true filter. Some PostgreSQL functions can still have side effects, so use a database account with read-only access.
-- Schema checks use the cached table and column names. Queries with table aliases or unclear column names may not be checked correctly.
-- Automated tests are a possible next step. For now, the setup guide has a short manual check list.
+- Write statements are refused, including recognized writes hidden inside a `SELECT`. A warning is added for `UPDATE` or `DELETE` with no filter or an always-true filter. The server does not check every PostgreSQL function called by a `SELECT`; a read-only database account reduces risk but is not a complete safeguard.
+- Schema checks use cached table and column names. They do not verify schema qualifiers and may miss table aliases or unclear column names.
+- One automated check covers a `DELETE` hidden inside a `SELECT`. The setup guide also has manual checks for connecting to PostgreSQL.
 
 ## Roadmap
 

@@ -1,6 +1,6 @@
 # Tool spec
 
-This page is the contract for **sql-copilot**. A tool call is a named function with arguments. The server returns one JSON object. Cursor starts the process over **stdio** (standard input and output). There is no HTTP port.
+This page describes the tools in **sql-copilot**. A tool call has a name and arguments and returns a JSON object. An MCP client starts the process over **stdio** (standard input and output). The server does not open a network port.
 
 Source of the names: `src/sql_mcp/tools/inspect.py` and `src/sql_mcp/tools/execute.py`.
 
@@ -33,29 +33,38 @@ uv sync
 copy .env.example .env
 ```
 
-Set `DB_URL` in `.env` as above. Copy `.cursor/mcp.example.json` to `.cursor/mcp.json`, then set `cwd` to the folder where you cloned this repo. `PYTHONPATH` must stay `src`.
+From the repository root, run the automated safety check:
+
+```text
+uv run python -m unittest discover -s tests -v
+```
+
+It checks that a `DELETE` hidden inside a `SELECT` is detected. It does not need a database.
+
+Set `DB_URL` in `.env` as above. For Cursor, copy `.cursor/mcp.example.json` to `.cursor/mcp.json`, then set `cwd` to the folder where you cloned this repo. `PYTHONPATH` must stay `src`. Other MCP clients need their own local server configuration.
 
 Reload the MCP server in Cursor, then check three calls:
 
 1. `ping_connection` returns `"status": "connected"`.
 2. `run_select` with `SELECT film_id, title FROM film` returns at most 10 rows and a `sql_to_run_locally` string.
-3. `run_mutation` with `DELETE FROM some_table` returns `"sql_not_executed": true`. The row is still there.
+3. `run_mutation` with `DELETE FROM film` returns `"sql_not_executed": true`. The server does not run the statement, so it does not change any rows.
 
 ## Shared rules
 
 - One SQL statement per call. A second statement in the same string is rejected.
-- Names are checked against the in-memory public schema before a `SELECT` preview runs.
-- `OFFSET` is removed from SQL the server builds. The preview does not skip rows.
-- `INSERT`, `UPDATE`, `DELETE`, `ALTER`, `DROP`, `CREATE`, and `TRUNCATE` are not executed. The message is: "DDL and DML auto-execute is disabled."
-- A `SELECT INTO` and a `SELECT` that hides `INSERT`, `UPDATE`, or `DELETE` inside `WITH` are treated as writes and are not executed.
+- Table and column names are checked against the in-memory public schema before a `SELECT` preview runs. The check does not verify schema qualifiers and may miss table aliases or unclear column names.
+- A top-level `OFFSET` is removed from the SQL the server builds, so the preview does not skip the outer query's first rows.
+- Direct `INSERT`, `UPDATE`, `DELETE`, `ALTER`, `DROP`, `CREATE`, and `TRUNCATE` statements are refused and not run.
+- `SELECT INTO`, and `SELECT` statements containing recognized `INSERT`, `UPDATE`, `DELETE`, `ALTER`, `DROP`, or `CREATE` expressions, are refused and not run.
 - `UPDATE` or `DELETE` with no `WHERE`, or with `WHERE true` or `WHERE 1=1`, is warned about. It is still not executed.
+- The server does not check every PostgreSQL function called by a `SELECT`. A read-only database account reduces risk but is not a complete safeguard.
 - Postgres errors on a real `SELECT` include the raw message and a short explanation.
 
 ## Current limits
 
-- Write commands are refused, including common writes hidden inside a `SELECT`. Some PostgreSQL functions can still have side effects. Use a database account with read-only access.
-- Schema checks use cached names and may miss mistakes involving table aliases or unclear column names.
-- Automated tests are a possible next step. The clone guide currently has manual checks instead.
+- Write commands are refused, including recognized writes hidden inside a `SELECT`. Some PostgreSQL functions can still have side effects; a read-only database account reduces risk but is not a complete safeguard.
+- Schema checks use cached names and may miss schema qualifiers, table aliases, or unclear column names.
+- One automated check covers a `DELETE` hidden inside a `SELECT`. The clone guide also has manual checks for connecting to PostgreSQL.
 
 ## Inspect
 
@@ -134,7 +143,7 @@ A non-`SELECT`, `SELECT INTO`, or a `SELECT` with a hidden write returns `status
 | --- | --- | --- |
 | `sql` | yes | Any one statement |
 
-Does not run the SQL. Returns `operation_type`, `syntax_valid`, `schema_valid`, `tables_referenced`, `columns_referenced`, `warnings`, `safe_to_auto_execute`, `explanation`, and `expected_tool`. `safe_to_auto_execute` is true only for a normal `SELECT` whose names match the cache.
+Does not run the SQL. Returns `operation_type`, `syntax_valid`, `schema_valid`, `tables_referenced`, `columns_referenced`, `warnings`, `safe_to_auto_execute`, `explanation`, and `expected_tool`. `safe_to_auto_execute` means the query passed the parser and cached-name checks and has no recognized hidden write. It does not check whether every PostgreSQL function in the query is harmless.
 
 ### `dry_run`
 
@@ -183,7 +192,7 @@ No arguments. Re-reads `information_schema` into the cache. Use this after you c
 | `last_n` | no | How many newest lines to return. Default 50 |
 | `operation_type` | no | Keep only that type, such as `SELECT` |
 
-Reads `LOG_PATH` (default `logs/sql_mcp.jsonl`). `SELECT` log lines store the row count, not the row data.
+Reads `LOG_PATH` (default `logs/sql_mcp.jsonl`). `SELECT` log lines store the SQL and preview row count, not the result rows.
 
 ### `get_status`
 
